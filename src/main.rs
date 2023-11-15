@@ -29,6 +29,6 @@ fn main() {
         let decoded_value = decode_bencoded_value(encoded_value);
         println!("{}", decoded_value.to_string());
     } else {
-        println!("unknown command: {}", args[1])
+        eprintln!("unknown command: {}", args[1])
     }
 }
