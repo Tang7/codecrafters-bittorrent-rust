@@ -6,10 +6,6 @@ use std::env;
 
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> (serde_json::Value, &str) {
-    if encoded_value.chars().last().unwrap() != 'e' {
-        panic!("bencode {} should ends with 'e'", encoded_value);
-    }
-
     match encoded_value.chars().next() {
         Some('0'..='9') => {
             if let Some((len, rest)) = encoded_value.split_once(':') {
