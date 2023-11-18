@@ -1,8 +1,19 @@
+use clap::{Parser, Subcommand};
 use serde_json;
-use std::env;
 
 // Available if you need it!
 // use serde_bencode
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand, Debug)]
+enum Command {
+    Decode { value: String },
+}
 
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> (serde_json::Value, &str) {
@@ -63,14 +74,12 @@ fn decode_bencoded_value(encoded_value: &str) -> (serde_json::Value, &str) {
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let command = &args[1];
+    let args = Args::parse();
 
-    if command == "decode" {
-        let encoded_value = &args[2];
-        let decoded_value = decode_bencoded_value(encoded_value);
-        println!("{}", decoded_value.0.to_string());
-    } else {
-        eprintln!("unknown command: {}", args[1])
+    match args.command {
+        Command::Decode { value } => {
+            let decoded_value = decode_bencoded_value(&value).0;
+            println!("{decoded_value}");
+        }
     }
 }
