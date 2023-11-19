@@ -1,6 +1,7 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use serde_bencode;
+use sha1::{Digest, Sha1};
 use std::path::PathBuf;
 
 mod bencode;
@@ -37,6 +38,12 @@ fn main() -> anyhow::Result<()> {
             } else {
                 todo!();
             }
+
+            let info_encoded = serde_bencode::to_bytes(&t.info).context("get encoded info")?;
+            let mut hasher = Sha1::new();
+            hasher.update(&info_encoded);
+            let info_hash = hasher.finalize();
+            println!("Info Hash: {}", hex::encode(&info_hash));
         }
     }
 

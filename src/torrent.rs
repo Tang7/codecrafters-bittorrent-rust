@@ -1,7 +1,7 @@
 use hashes::Hashes;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 // A torrent file (also known as a metainfo file) contains a bencoded dictionary.
 pub struct Torrent {
     // The URL of the tracker.
@@ -10,7 +10,7 @@ pub struct Torrent {
     pub info: Info,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Info {
     // name: a UTF-8 encoded string which is the suggested name to save the file (or directory) as
     name: String,
@@ -30,7 +30,7 @@ pub struct Info {
     pub keys: Keys,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Keys {
     // If length is present then the download represents a single file.
@@ -42,7 +42,7 @@ pub enum Keys {
     MultiFile { files: Vec<File> },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct File {
     // length - The length of the file, in bytes.
     length: usize,
@@ -52,7 +52,8 @@ pub struct File {
 }
 
 mod hashes {
-    use serde::de::{self, Deserialize, Deserializer, Visitor};
+    use serde::de::{Deserialize, Deserializer, Visitor};
+    use serde::ser::{Serialize, Serializer};
     use std::fmt;
 
     #[derive(Debug, Clone)]
@@ -69,7 +70,7 @@ mod hashes {
 
         fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
         where
-            E: de::Error,
+            E: serde::de::Error,
         {
             if v.len() % 20 != 0 {
                 return Err(E::custom(format!("length is {}", v.len())));
@@ -89,6 +90,16 @@ mod hashes {
             D: Deserializer<'de>,
         {
             deserializer.deserialize_bytes(HashesVisitor)
+        }
+    }
+
+    impl Serialize for Hashes {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let single_slice = self.0.concat();
+            serializer.serialize_bytes(&single_slice)
         }
     }
 }
