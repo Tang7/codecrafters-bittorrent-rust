@@ -1,5 +1,6 @@
 use hashes::Hashes;
 use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 // A torrent file (also known as a metainfo file) contains a bencoded dictionary.
@@ -8,6 +9,18 @@ pub struct Torrent {
     pub announce: String,
     // This maps to a dictionary, with keys described in Info.
     pub info: Info,
+}
+
+impl Torrent {
+    pub fn info_hash(&self) -> [u8; 20] {
+        let info_encoded = serde_bencode::to_bytes(&self.info).expect("get encoded info");
+        let mut hasher = Sha1::new();
+        hasher.update(&info_encoded);
+        hasher
+            .finalize()
+            .try_into()
+            .expect("GenericArray<_, 20> == [_; 20]")
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -7,33 +7,33 @@ pub struct TrackerRequest {
     // peer_id: a unique identifier for your client
     //
     // A string of length 20 that you get to pick. You can use something like 00112233445566778899.
-    peer_id: String,
+    pub peer_id: String,
 
     // port: the port your client is listening on
     //
     // You can set this to 6881, you will not have to support this functionality during this challenge.
-    port: u16,
+    pub port: u16,
 
     // uploaded: the total amount uploaded so far
     //
     // Since your client hasn't uploaded anything yet, you can setPeersVisitor.
-    uploaded: usize,
+    pub uploaded: usize,
 
     // downloaded: the total amount downloaded so far
     //
     // Since your client hasn't downloaded anything yet, you can set this to 0.
-    downloaded: usize,
+    pub downloaded: usize,
 
     // left: the number of bytes left to download
     //
     // Since you client hasn't downloaded anything yet, this'll be the total length of the file (you've extracted this value from the torrent file in previous stages)
-    left: usize,
+    pub left: usize,
 
     // compact: whether the peer list should use the compact representation
     //
     // For the purposes of this challenge, set this to 1.
     // The compact representation is more commonly used in the wild, the non-compact representation is mostly supported for backward-compatibility.
-    compact: u8,
+    pub compact: u8,
 }
 
 // The tracker's response will be a bencoded dictionary.
@@ -42,12 +42,12 @@ pub struct TrackerResponse {
     // interval:
     // An integer, indicating how often your client should make a request to the tracker.
     // You can ignore this value for the purposes of this challenge.
-    interval: usize,
+    pub interval: usize,
 
     // peers.
     // A string, which contains list of peers that your client can connect to.
     // Each peer is represented using 6 bytes. The first 4 bytes are the peer's IP address and the last 2 bytes are the peer's port number.
-    peers: Peers,
+    pub peers: Peers,
 }
 
 mod peers {
