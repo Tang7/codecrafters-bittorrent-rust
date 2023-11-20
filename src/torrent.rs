@@ -11,6 +11,9 @@ pub struct Torrent {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+// The info-hash must be the hash of the encoded form as found in the .torrent file,
+// which is identical to bdecoding the metainfo file, extracting the info dictionary
+// and encoding it if and only if the bdecoder fully validated the input.
 pub struct Info {
     // name: a UTF-8 encoded string which is the suggested name to save the file (or directory) as
     name: String,
@@ -19,10 +22,10 @@ pub struct Info {
     // For the purposes of transfer, files are split into fixed-size pieces which are all the same length,
     // except for possibly the last one which may be truncated.
     #[serde(rename = "piece length")]
-    plength: usize,
+    pub plength: usize,
     // pieces: concatenated SHA-1 hashes of each piece, maps to a string whose length is a multiple of 20.
     // pieces: Vec<[u8; 20]>,
-    pieces: Hashes,
+    pub pieces: Hashes,
     //length: size of the file in bytes, for single-file torrents.
     // If length is present then the download represents a single file,
     // otherwise it represents a set of files which go in a directory structure
