@@ -1,11 +1,10 @@
 use anyhow::Context;
+use bittorrent_starter_rust::bencode;
+use bittorrent_starter_rust::torrent;
 use clap::{Parser, Subcommand};
 use serde_bencode;
 use sha1::{Digest, Sha1};
 use std::path::PathBuf;
-
-mod bencode;
-mod torrent;
 
 #[derive(Parser, Debug)]
 struct Args {
