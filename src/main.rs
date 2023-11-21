@@ -1,10 +1,14 @@
 use anyhow::Context;
 use bittorrent_starter_rust::bencode;
+use bittorrent_starter_rust::handshake::HandShake;
 use bittorrent_starter_rust::torrent;
 use bittorrent_starter_rust::tracker::*;
 use clap::{Parser, Subcommand};
 use serde_bencode;
+use std::net::SocketAddrV4;
 use std::path::PathBuf;
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -17,6 +21,7 @@ enum Command {
     Decode { value: String },
     Info { torrent: PathBuf },
     Peers { torrent: PathBuf },
+    Handshake { torrent: PathBuf, peer: String },
 }
 
 #[tokio::main]
@@ -93,6 +98,32 @@ async fn main() -> anyhow::Result<()> {
             for peer in tracker_response.peers.0 {
                 println!("{}:{}", peer.ip(), peer.port());
             }
+        }
+        Command::Handshake { torrent, peer } => {
+            let torrent_file = std::fs::read(torrent).context("read torrent file")?;
+            let t: torrent::Torrent =
+                serde_bencode::from_bytes(&torrent_file).context("parse torrent file")?;
+
+            let info_hash = t.info_hash();
+            let peer = peer.parse::<SocketAddrV4>().context("parse peer address")?;
+            let mut peer = tokio::net::TcpStream::connect(peer)
+                .await
+                .context("connect to peer")?;
+
+            let handshake = HandShake::new(info_hash, *b"00112233445566778899");
+            let mut handshake_bytes = handshake.as_bytes();
+            peer.write_all(&handshake_bytes)
+                .await
+                .context("write handshake")?;
+            peer.read_exact(&mut handshake_bytes)
+                .await
+                .context("read handshake")?;
+
+            if handshake_bytes[28..48] != handshake.info_hash {
+                eprintln!("mismatched info hash.")
+            }
+
+            println!("Peer ID: {}", hex::encode(&handshake_bytes[48..68]));
         }
     }
 
