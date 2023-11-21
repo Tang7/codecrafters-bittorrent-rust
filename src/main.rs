@@ -1,6 +1,6 @@
 use anyhow::Context;
 use bittorrent_starter_rust::bencode;
-use bittorrent_starter_rust::handshake::HandShake;
+use bittorrent_starter_rust::handshake::Handshake;
 use bittorrent_starter_rust::torrent;
 use bittorrent_starter_rust::tracker::*;
 use clap::{Parser, Subcommand};
@@ -106,16 +106,16 @@ async fn main() -> anyhow::Result<()> {
 
             let info_hash = t.info_hash();
             let peer = peer.parse::<SocketAddrV4>().context("parse peer address")?;
-            let mut peer = tokio::net::TcpStream::connect(peer)
+            let mut conn = tokio::net::TcpStream::connect(peer)
                 .await
                 .context("connect to peer")?;
 
-            let handshake = HandShake::new(info_hash, *b"00112233445566778899");
+            let handshake = Handshake::new(info_hash, *b"00112233445566778899");
             let mut handshake_bytes = handshake.as_bytes();
-            peer.write_all(&handshake_bytes)
+            conn.write_all(&handshake_bytes)
                 .await
                 .context("write handshake")?;
-            peer.read_exact(&mut handshake_bytes)
+            conn.read_exact(&mut handshake_bytes)
                 .await
                 .context("read handshake")?;
 
