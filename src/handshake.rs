@@ -1,5 +1,11 @@
 // The handshake is a message consisting of the following parts as described in the peer protocol:
 
+use std::net::SocketAddrV4;
+
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+
 // length of the protocol string (BitTorrent protocol) which is 19 (1 byte)
 // the string BitTorrent protocol (19 bytes)
 // eight reserved bytes, which are all set to zero (8 bytes)
@@ -10,7 +16,7 @@ pub struct Handshake {
     protocol: [u8; 19],
     reserved: [u8; 8],
     pub info_hash: [u8; 20],
-    peer_id: [u8; 20],
+    pub peer_id: [u8; 20],
 }
 
 impl Handshake {
@@ -32,5 +38,22 @@ impl Handshake {
         bytes[28..48].copy_from_slice(&self.info_hash);
         bytes[48..68].copy_from_slice(&self.peer_id);
         bytes
+    }
+
+    pub async fn send(&mut self, peer: &str) -> anyhow::Result<TcpStream> {
+        let peer = peer.parse::<SocketAddrV4>()?;
+        let mut stream = tokio::net::TcpStream::connect(peer).await?;
+        // TODO: how to change handshake inplace to avoid copy.
+        let mut handshake_bytes = self.as_bytes();
+        stream.write_all(&handshake_bytes).await?;
+        stream.read_exact(&mut handshake_bytes).await?;
+
+        if handshake_bytes[28..48] != self.info_hash {
+            return Err(anyhow::anyhow!("Mismatched info hash from handshake"));
+        }
+
+        self.peer_id = handshake_bytes[48..68].try_into().unwrap();
+
+        Ok(stream)
     }
 }

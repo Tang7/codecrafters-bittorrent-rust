@@ -1,16 +1,14 @@
+mod handshake;
 mod torrent;
 mod tracker;
 
-use crate::torrent::read_torrent_file;
-use crate::tracker::TrackerRequest;
-use anyhow::Context;
+use handshake::Handshake;
+use torrent::read_torrent_file;
+use tracker::TrackerRequest;
+
 use bittorrent_starter_rust::bencode;
-use bittorrent_starter_rust::handshake::Handshake;
 use clap::{Parser, Subcommand};
-use std::net::SocketAddrV4;
 use std::path::PathBuf;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -75,25 +73,10 @@ async fn main() -> anyhow::Result<()> {
 
             let info_hash = torrent_file.info_hash()?;
 
-            let peer = peer.parse::<SocketAddrV4>().context("parse peer address")?;
-            let mut conn = tokio::net::TcpStream::connect(peer)
-                .await
-                .context("connect to peer")?;
+            let mut handshake = Handshake::new(info_hash, *b"00112233445566778899");
+            handshake.send(&peer).await?;
 
-            let handshake = Handshake::new(info_hash, *b"00112233445566778899");
-            let mut handshake_bytes = handshake.as_bytes();
-            conn.write_all(&handshake_bytes)
-                .await
-                .context("write handshake")?;
-            conn.read_exact(&mut handshake_bytes)
-                .await
-                .context("read handshake")?;
-
-            if handshake_bytes[28..48] != handshake.info_hash {
-                eprintln!("mismatched info hash.")
-            }
-
-            println!("Peer ID: {}", hex::encode(&handshake_bytes[48..68]));
+            println!("Peer ID: {}", hex::encode(handshake.peer_id));
         }
     }
 
