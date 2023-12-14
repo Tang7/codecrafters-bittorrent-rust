@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 pub use peers::Peers;
 
+use crate::torrent::Torrent;
+
 #[derive(Debug, Clone, Serialize)]
 pub struct TrackerRequest {
     // peer_id: a unique identifier for your client
@@ -34,6 +36,54 @@ pub struct TrackerRequest {
     // For the purposes of this challenge, set this to 1.
     // The compact representation is more commonly used in the wild, the non-compact representation is mostly supported for backward-compatibility.
     pub compact: u8,
+}
+
+impl TrackerRequest {
+    pub const TRACKER_PORT: u16 = 6881;
+
+    pub fn new(peer_id: &str, left: usize) -> Self {
+        Self {
+            peer_id: peer_id.to_owned(),
+            port: TrackerRequest::TRACKER_PORT,
+            uploaded: 0,
+            downloaded: 0,
+            left: left,
+            compact: 1,
+        }
+    }
+
+    pub async fn send(
+        &self,
+        url: &str,
+        info_hash: [u8; Torrent::HASH_SIZE],
+    ) -> anyhow::Result<TrackerResponse> {
+        let request_params = serde_urlencoded::to_string(&self)?;
+
+        let tracker_url = format!(
+            "{}?{}&info_hash={}",
+            url,
+            request_params,
+            &urlencode(&info_hash)
+        );
+
+        let response = reqwest::get(tracker_url).await?;
+        let response = response.bytes().await?;
+
+        serde_bencode::from_bytes(&response).map_err(|e| anyhow::anyhow!(e))
+    }
+}
+
+// Let's say the hexadecimal representation of our info hash is d69f91e6b2ae4c542468d1073a71d4ea13879a7f
+// This 40 character long string was representing 20 bytes, so each character pair corresponds to a byte
+// We can just put a % before each byte so the URL-encoded representation would be:%d6%9f%91%e6%b2%ae%4c%54%24%68%d1%07%3a%71%d4%ea%13%87%9a%7f
+// The result is 60 characters long.
+fn urlencode(t: &[u8; 20]) -> String {
+    let mut encoded = String::with_capacity(3 * t.len());
+    for &byte in t {
+        encoded.push('%');
+        encoded.push_str(&hex::encode(&[byte]));
+    }
+    encoded
 }
 
 // The tracker's response will be a bencoded dictionary.
