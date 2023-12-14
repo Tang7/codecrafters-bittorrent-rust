@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use hashes::Hashes;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
@@ -12,15 +14,19 @@ pub struct Torrent {
 }
 
 impl Torrent {
-    pub fn info_hash(&self) -> [u8; 20] {
-        let info_encoded = serde_bencode::to_bytes(&self.info).expect("get encoded info");
+    pub const HASH_SIZE: usize = 20;
+
+    pub fn info_hash(&self) -> anyhow::Result<[u8; Torrent::HASH_SIZE]> {
+        let info_encoded = serde_bencode::to_bytes(&self.info)?;
         let mut hasher = Sha1::new();
         hasher.update(&info_encoded);
-        hasher
-            .finalize()
-            .try_into()
-            .expect("GenericArray<_, 20> == [_; 20]")
+        Ok(hasher.finalize().try_into()?)
     }
+}
+
+pub fn read_torrent_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Torrent> {
+    let content = std::fs::read(path)?;
+    Ok(serde_bencode::from_bytes(&content)?)
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
