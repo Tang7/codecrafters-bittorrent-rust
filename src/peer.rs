@@ -17,6 +17,7 @@ use tokio_util::codec::Encoder;
 // 8 - cancel
 // 'choke', 'unchoke', 'interested', and 'not interested' have no payload.
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum MessageType {
     Choke = 0,
     Unchode = 1,
@@ -29,6 +30,7 @@ pub enum MessageType {
     Cancel = 8,
 }
 
+#[derive(Debug, Clone)]
 pub struct Message {
     pub id: MessageType,
     pub payload: Vec<u8>,
@@ -38,9 +40,9 @@ impl Message {
     // All current implementations use 2^14 (16 kiB), and close connections which request an amount greater than that.
     pub const MAX: usize = 1 << 16;
 }
-struct MessageDecoder {}
+pub struct MessageFrame;
 
-impl Decoder for MessageDecoder {
+impl Decoder for MessageFrame {
     type Item = Message;
     type Error = std::io::Error;
 
@@ -53,13 +55,17 @@ impl Decoder for MessageDecoder {
 
         // Peer messages consist of a message length prefix (4 bytes), message id (1 byte) and a payload (variable size).
         // Read length marker.
-        let mut length_bytes = [0u8; 4];
+        let mut length_bytes = [0; 4];
         length_bytes.copy_from_slice(&src[..4]);
-        let length = u32::from_le_bytes(length_bytes) as usize;
+        let length = u32::from_be_bytes(length_bytes) as usize;
 
         if length == 0 {
             src.advance(4);
             return self.decode(src);
+        }
+
+        if src.len() < 5 {
+            return Ok(None);
         }
 
         // Check that the length is not too large to avoid a denial of
@@ -67,7 +73,7 @@ impl Decoder for MessageDecoder {
         if length > Message::MAX {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Frame of length {} is too large.", length),
+                format!("Frame of length {} is too large to decode.", length),
             ));
         }
 
@@ -117,9 +123,7 @@ impl Decoder for MessageDecoder {
     }
 }
 
-struct MessageEncoder {}
-
-impl Encoder<Message> for MessageEncoder {
+impl Encoder<Message> for MessageFrame {
     type Error = std::io::Error;
 
     fn encode(&mut self, item: Message, dst: &mut BytesMut) -> Result<(), Self::Error> {

@@ -35,3 +35,4 @@ tempfile = "3"                                                     # creating te
 thiserror = "1.0.38"                                               # error handling
 tokio = { version = "1.23.0", features = ["full"] }                # async http requests
 tokio-util = { version = "0.7.10", features = ["codec"] }
+futures-util = "0.3"
