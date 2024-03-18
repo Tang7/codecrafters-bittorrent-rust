@@ -5,13 +5,13 @@ mod tracker;
 
 use anyhow::Context;
 use handshake::Handshake;
-use peer::{MessageFrame, MessageType};
+use peer::{Message, MessageFrame, MessageType};
 use torrent::read_torrent_file;
 use tracker::TrackerRequest;
 
 use bittorrent_starter_rust::bencode;
 use clap::{Parser, Subcommand};
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use std::path::PathBuf;
 
 const PEER_ID: &str = "00112233445566778899";
@@ -102,9 +102,9 @@ async fn main() -> anyhow::Result<()> {
             println!("Peer ID: {}", hex::encode(handshake.peer_id));
         }
         Command::DownloadPiece {
-            output,
+            output: _,
             torrent,
-            piece,
+            piece: _,
         } => {
             let torrent_file = read_torrent_file(torrent)?;
             let info_hash = torrent_file.info_hash()?;
@@ -131,6 +131,22 @@ async fn main() -> anyhow::Result<()> {
                 .context("invalid message")?;
 
             assert_eq!(MessageType::Bitfield, bitfield_msg.id);
+
+            peer.send(Message {
+                id: MessageType::Interested,
+                payload: Vec::new(),
+            })
+            .await
+            .context("send interested message")?;
+
+            let unchoke = peer
+                .next()
+                .await
+                .expect("wait unchoke message")
+                .context("invalid message while waiting unchoke")?;
+
+            assert_eq!(MessageType::Unchoke, unchoke.id);
+            assert!(unchoke.payload.is_empty());
         }
     }
 

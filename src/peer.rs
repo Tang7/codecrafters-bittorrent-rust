@@ -20,7 +20,7 @@ use tokio_util::codec::Encoder;
 #[derive(Debug, Clone, PartialEq)]
 pub enum MessageType {
     Choke = 0,
-    Unchode = 1,
+    Unchoke = 1,
     Interested = 2,
     NotIntereted = 3,
     Have = 4,
@@ -92,7 +92,7 @@ impl Decoder for MessageFrame {
         // All non-keepalive messages start with a single byte which gives their type.
         let msg_type = match src[4] {
             0 => MessageType::Choke,
-            1 => MessageType::Unchode,
+            1 => MessageType::Unchoke,
             2 => MessageType::Interested,
             3 => MessageType::NotIntereted,
             4 => MessageType::Have,
