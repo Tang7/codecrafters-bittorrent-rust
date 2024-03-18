@@ -5,7 +5,8 @@ mod tracker;
 
 use anyhow::Context;
 use handshake::Handshake;
-use peer::{Message, MessageFrame, MessageType, Request};
+use peer::{Message, MessageFrame, MessageType, Piece, Request};
+use sha1::{Digest, Sha1};
 use torrent::read_torrent_file;
 use tracker::TrackerRequest;
 
@@ -44,7 +45,7 @@ enum Command {
     },
     DownloadPiece {
         #[arg(short)]
-        output: PathBuf,
+        output: String,
         torrent: PathBuf,
         piece: usize,
     },
@@ -105,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
             println!("Peer ID: {}", hex::encode(handshake.peer_id));
         }
         Command::DownloadPiece {
-            output: _,
+            output: out_path,
             torrent,
             piece: piece_id,
         } => {
@@ -154,7 +155,7 @@ async fn main() -> anyhow::Result<()> {
             // Start download piece speficied by piece id.
             let num_pieces = torrent_file.info.pieces.0.len();
             assert!(piece_id < num_pieces);
-            // let piece_hash = torrent_file.info.pieces.0[piece_id];
+            let piece_hash = torrent_file.info.pieces.0[piece_id];
             // Last piece may not equal to defined plength.
             let piece_size =
                 if piece_id == num_pieces - 1 && (length % torrent_file.info.plength) != 0 {
@@ -165,6 +166,7 @@ async fn main() -> anyhow::Result<()> {
 
             // Break the piece into blocks of 16 kiB (16 * 1024 bytes) and send a request message for each block
             let num_blocks = (piece_size + (BLOCK_SIZE - 1)) / BLOCK_SIZE;
+            let mut block_data = Vec::with_capacity(piece_size);
             for block in 0..num_blocks {
                 // The last block will contain 2^14 bytes or less, need to calculate this value using the piece length.
                 let block_size = if block == num_blocks - 1 && (piece_size % BLOCK_SIZE) != 0 {
@@ -192,8 +194,30 @@ async fn main() -> anyhow::Result<()> {
                     .expect("wait request response")
                     .context("invalid request response")?;
 
-                assert!(!piece_msg.payload.is_empty())
+                assert!(!piece_msg.payload.is_empty());
+
+                let piece_data = Piece::load_from_payload(&piece_msg.payload)
+                    .ok_or(anyhow::anyhow!("Invalid piece from peer"))?;
+                assert_eq!(piece_data.index as usize, piece_id);
+                assert_eq!(piece_data.begin as usize, block * BLOCK_SIZE);
+                assert_eq!(piece_data.piece.len(), block_size);
+
+                block_data.extend_from_slice(piece_data.piece);
             }
+
+            assert_eq!(block_data.len(), piece_size);
+
+            // Check hash before writing data into file.
+            let mut hasher = Sha1::new();
+            hasher.update(&block_data);
+            let hash: [u8; 20] = hasher
+                .finalize()
+                .try_into()
+                .expect("cannot get hash from block data");
+            assert_eq!(hash, piece_hash);
+
+            tokio::fs::write(&out_path, block_data).await?;
+            println!("Piece {} downloaded to {}.", piece_id, out_path);
         }
     }
 

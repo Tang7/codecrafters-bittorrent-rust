@@ -170,3 +170,39 @@ impl Request {
         bytes
     }
 }
+
+#[derive(Debug, Clone)]
+#[repr(C)]
+pub struct Piece<'a> {
+    pub index: u32,
+    pub begin: u32,
+    pub piece: &'a [u8],
+}
+
+impl<'a> Piece<'a> {
+    const INDEX_SIZE: usize = std::mem::size_of::<u32>();
+    const BEGIN_SIZE: usize = std::mem::size_of::<u32>();
+
+    pub fn load_from_payload(data: &'a [u8]) -> Option<Self> {
+        if data.len() < Self::INDEX_SIZE + Self::BEGIN_SIZE {
+            return None;
+        }
+
+        // Get the index and begin value.
+        let index = u32::from_be_bytes(data[0..Self::INDEX_SIZE].try_into().ok()?);
+        let begin = u32::from_be_bytes(
+            data[Self::INDEX_SIZE..(Self::INDEX_SIZE + Self::BEGIN_SIZE)]
+                .try_into()
+                .ok()?,
+        );
+
+        // index + begin points to the start index of piece data.
+        let piece = &data[(Self::INDEX_SIZE + Self::BEGIN_SIZE)..];
+
+        Some(Piece {
+            index,
+            begin,
+            piece,
+        })
+    }
+}
