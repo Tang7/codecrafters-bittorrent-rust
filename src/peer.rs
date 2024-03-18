@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use bytes::BufMut;
 use bytes::{Buf, BytesMut};
 use tokio_util::codec::Decoder;
@@ -148,5 +150,23 @@ impl Encoder<Message> for MessageFrame {
         dst.put_u8(item.id as u8);
         dst.extend_from_slice(&item.payload);
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Request {
+    pub index: u32,
+    pub begin: u32,
+    pub length: u32,
+}
+
+impl Request {
+    pub fn as_bytes(&self) -> [u8; size_of::<Self>()] {
+        let mut bytes = [0u8; size_of::<Request>()];
+        bytes[0..4].copy_from_slice(&self.index.to_be_bytes());
+        bytes[4..8].copy_from_slice(&self.begin.to_be_bytes());
+        bytes[8..12].copy_from_slice(&self.length.to_be_bytes());
+        bytes
     }
 }

@@ -5,7 +5,7 @@ mod tracker;
 
 use anyhow::Context;
 use handshake::Handshake;
-use peer::{Message, MessageFrame, MessageType};
+use peer::{Message, MessageFrame, MessageType, Request};
 use torrent::read_torrent_file;
 use tracker::TrackerRequest;
 
@@ -16,6 +16,9 @@ use std::path::PathBuf;
 
 const PEER_ID: &str = "00112233445566778899";
 const PEER_ID_BYTES: [u8; 20] = *b"00112233445566778899";
+
+// Each block max size is 16 kiB (16 * 1024 bytes)
+const BLOCK_SIZE: usize = 1 << 14;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -104,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
         Command::DownloadPiece {
             output: _,
             torrent,
-            piece: _,
+            piece: piece_id,
         } => {
             let torrent_file = read_torrent_file(torrent)?;
             let info_hash = torrent_file.info_hash()?;
@@ -147,6 +150,50 @@ async fn main() -> anyhow::Result<()> {
 
             assert_eq!(MessageType::Unchoke, unchoke.id);
             assert!(unchoke.payload.is_empty());
+
+            // Start download piece speficied by piece id.
+            let num_pieces = torrent_file.info.pieces.0.len();
+            assert!(piece_id < num_pieces);
+            // let piece_hash = torrent_file.info.pieces.0[piece_id];
+            // Last piece may not equal to defined plength.
+            let piece_size =
+                if piece_id == num_pieces - 1 && (length % torrent_file.info.plength) != 0 {
+                    length % torrent_file.info.plength
+                } else {
+                    torrent_file.info.plength
+                };
+
+            // Break the piece into blocks of 16 kiB (16 * 1024 bytes) and send a request message for each block
+            let num_blocks = (piece_size + (BLOCK_SIZE - 1)) / BLOCK_SIZE;
+            for block in 0..num_blocks {
+                // The last block will contain 2^14 bytes or less, need to calculate this value using the piece length.
+                let block_size = if block == num_blocks - 1 && (piece_size % BLOCK_SIZE) != 0 {
+                    piece_size % BLOCK_SIZE
+                } else {
+                    BLOCK_SIZE
+                };
+
+                let request = Request {
+                    index: piece_id as u32,
+                    begin: (block * BLOCK_SIZE) as u32,
+                    length: block_size as u32,
+                };
+
+                peer.send(Message {
+                    id: MessageType::Request,
+                    payload: request.as_bytes().to_vec(),
+                })
+                .await
+                .context("send request message")?;
+
+                let piece_msg = peer
+                    .next()
+                    .await
+                    .expect("wait request response")
+                    .context("invalid request response")?;
+
+                assert!(!piece_msg.payload.is_empty())
+            }
         }
     }
 
