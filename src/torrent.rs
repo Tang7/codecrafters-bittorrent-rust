@@ -52,6 +52,16 @@ pub struct Info {
     pub keys: Keys,
 }
 
+impl Info {
+    pub fn file_length(&self) -> Option<usize> {
+        if let Keys::SingleFile { length } = self.keys {
+            Some(length)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Keys {
