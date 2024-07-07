@@ -35,7 +35,7 @@ pub fn read_torrent_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Torrent> {
 // and encoding it if and only if the bdecoder fully validated the input.
 pub struct Info {
     // name: a UTF-8 encoded string which is the suggested name to save the file (or directory) as
-    name: String,
+    pub name: String,
     // piece length: number of bytes in each piece maps to the number of bytes in each piece the file is split into.
     //
     // For the purposes of transfer, files are split into fixed-size pieces which are all the same length,
@@ -87,6 +87,7 @@ mod hashes {
     use serde::de::{Deserialize, Deserializer, Visitor};
     use serde::ser::{Serialize, Serializer};
     use std::fmt;
+    use std::ops::Index;
 
     #[derive(Debug, Clone)]
     pub struct Hashes(pub Vec<[u8; 20]>);
@@ -132,6 +133,20 @@ mod hashes {
         {
             let single_slice = self.0.concat();
             serializer.serialize_bytes(&single_slice)
+        }
+    }
+
+    impl Hashes {
+        pub fn num_pieces(&self) -> usize {
+            self.0.len()
+        }
+    }
+
+    impl Index<usize> for Hashes {
+        type Output = [u8; 20];
+
+        fn index(&self, index: usize) -> &Self::Output {
+            &self.0[index]
         }
     }
 }

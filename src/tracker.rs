@@ -104,6 +104,7 @@ mod peers {
     use serde::de::{self, Deserialize, Deserializer, Visitor};
     use std::fmt;
     use std::net::{Ipv4Addr, SocketAddrV4};
+    use std::vec::IntoIter;
 
     #[derive(Debug, Clone)]
     pub struct Peers(pub Vec<SocketAddrV4>);
@@ -145,6 +146,13 @@ mod peers {
             D: Deserializer<'de>,
         {
             deserializer.deserialize_bytes(PeersVisitor)
+        }
+    }
+
+    impl Peers {
+        // Method to return an iterator over the peers
+        pub fn into_iter(self) -> IntoIter<SocketAddrV4> {
+            self.0.into_iter()
         }
     }
 }
